@@ -1,6 +1,7 @@
-# Data and models - too large for GitHub
+# Data - too large for GitHub
 data/
-models/
+
+# Model weights - too large for GitHub
 *.pt
 *.pth
 *.h5
