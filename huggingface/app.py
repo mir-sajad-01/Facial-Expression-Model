@@ -1,0 +1,129 @@
+import gradio as gr
+import torch
+import torch.nn as nn
+from torchvision import models, transforms
+from PIL import Image
+import numpy as np
+
+# ── Emotions ─────────────────────────────────────────────────────────────────
+EMOTIONS = ['Angry', 'Disgust', 'Fear', 'Happy', 'Neutral', 'Sad', 'Surprise']
+
+EMOTION_EMOJIS = {
+    'Angry':    '😠',
+    'Disgust':  '🤢',
+    'Fear':     '😨',
+    'Happy':    '😊',
+    'Neutral':  '😐',
+    'Sad':      '😢',
+    'Surprise': '😲'
+}
+
+# ── Build model ───────────────────────────────────────────────────────────────
+def build_model():
+    model = models.mobilenet_v2(weights=None)
+    model.features[0][0] = nn.Conv2d(
+        in_channels=1, out_channels=32,
+        kernel_size=3, stride=2, padding=1, bias=False
+    )
+    in_features = model.classifier[1].in_features
+    model.classifier = nn.Sequential(
+        nn.Dropout(p=0.3),
+        nn.Linear(in_features, 256),
+        nn.ReLU(),
+        nn.Dropout(p=0.2),
+        nn.Linear(256, 7)
+    )
+    return model
+
+
+# ── Load model ────────────────────────────────────────────────────────────────
+device = torch.device('cpu')
+model  = build_model()
+
+checkpoint = torch.load('best_model.pth', map_location=device)
+model.load_state_dict(checkpoint['model_state_dict'])
+model.eval()
+print(f"Model loaded — val_acc {checkpoint['val_acc']:.2f}%")
+
+
+# ── Image transform ───────────────────────────────────────────────────────────
+transform = transforms.Compose([
+    transforms.Grayscale(num_output_channels=1),
+    transforms.Resize((48, 48)),
+    transforms.ToTensor(),
+    transforms.Normalize(mean=[0.5], std=[0.5])
+])
+
+
+# ── Prediction function ───────────────────────────────────────────────────────
+def predict_emotion(image):
+    if image is None:
+        return {}
+
+    # Convert to PIL if needed
+    if not isinstance(image, Image.Image):
+        image = Image.fromarray(image)
+
+    # Preprocess
+    tensor = transform(image).unsqueeze(0).to(device)
+
+    # Predict
+    with torch.no_grad():
+        outputs     = model(tensor)
+        probs       = torch.softmax(outputs, dim=1)[0]
+        probs_numpy = probs.cpu().numpy()
+
+    # Build result dictionary
+    result = {}
+    for emotion, prob in zip(EMOTIONS, probs_numpy):
+        label = f"{EMOTION_EMOJIS[emotion]} {emotion}"
+        result[label] = float(prob)
+
+    return result
+
+
+# ── Gradio interface ──────────────────────────────────────────────────────────
+with gr.Blocks(title="Facial Expression Recognition") as demo:
+
+    gr.Markdown("""
+    # 😊 Facial Expression Recognition
+    Upload a face image and the model will detect the emotion.
+    
+    **Model:** MobileNetV2 trained on FER2013 (35,887 images)  
+    **Accuracy:** 59.03% on test set  
+    **Emotions:** Angry, Disgust, Fear, Happy, Neutral, Sad, Surprise
+    """)
+
+    with gr.Row():
+        with gr.Column():
+            image_input = gr.Image(
+                label="Upload Face Image",
+                type="pil"
+            )
+            submit_btn = gr.Button("Predict Emotion", variant="primary")
+
+        with gr.Column():
+            output = gr.Label(
+                label="Emotion Prediction",
+                num_top_classes=7
+            )
+
+    gr.Markdown("""
+    ### About this project
+    Built as a B.Tech final year project — trained from scratch using PyTorch and Transfer Learning.
+    
+    [GitHub Repository](https://github.com/mir-sajad-01/Facial-Expression-Model)
+    """)
+
+    submit_btn.click(
+        fn=predict_emotion,
+        inputs=image_input,
+        outputs=output
+    )
+
+    gr.Examples(
+        examples=[],
+        inputs=image_input
+    )
+
+demo.launch(server_name="0.0.0.0", server_port=7860)
