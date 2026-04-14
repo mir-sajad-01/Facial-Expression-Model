@@ -3,9 +3,28 @@
 ![Python](https://img.shields.io/badge/Python-3.12-blue)
 ![PyTorch](https://img.shields.io/badge/PyTorch-2.11-orange)
 ![Accuracy](https://img.shields.io/badge/Accuracy-59.03%25-green)
-![Status](https://img.shields.io/badge/Status-In%20Progress-yellow)
+![Status](https://img.shields.io/badge/Status-Complete-brightgreen)
+![HuggingFace](https://img.shields.io/badge/Demo-HuggingFace-yellow)
 
-A complete deep learning project that recognizes human emotions from face images in real time. Built entirely from scratch — from understanding what a neural network is, all the way to deploying a working model. Every single line of code is written and understood, not copied blindly.
+A complete deep learning project that recognizes human emotions from face images in real time. Built entirely from scratch — from understanding what a neural network is, all the way to deploying a working model on Hugging Face. Every single line of code is written and understood, not copied blindly.
+
+## 🚀 Live Demo
+
+**Try it here:** https://huggingface.co/spaces/mir-sajad-01/facial-expression-recognition
+
+Upload any face photo and get instant emotion prediction!
+
+**Use via API:**
+```python
+from gradio_client import Client, handle_file
+
+client = Client("mir-sajad-01/facial-expression-recognition")
+result = client.predict(
+    image=handle_file('face.jpg'),
+    api_name="/predict_emotion"
+)
+print(result)
+```
 
 ---
 
@@ -24,7 +43,7 @@ Real-world applications include:
 
 ## What This Model Does
 
-Takes any face image as input and outputs one of 7 emotion labels with a confidence score:
+Takes any face image as input and outputs one of 7 emotion labels with confidence scores:
 
 | Emotion  | F1 Score | Notes |
 |----------|----------|-------|
@@ -52,15 +71,12 @@ Takes any face image as input and outputs one of 7 emotion labels with a confide
 | Dataset size | 35,887 images |
 
 ### Training Curves — Phase 2
-
 ![Training Curves Phase 2](models/curves_phase2.png)
 
 ### Per-Emotion Accuracy
-
 ![Per Emotion Accuracy](models/per_emotion_accuracy.png)
 
 ### Confusion Matrix
-
 ![Confusion Matrix](models/confusion_matrix.png)
 
 ---
@@ -74,7 +90,6 @@ Takes any face image as input and outputs one of 7 emotion labels with a confide
   - Phase 1: Backbone frozen, only custom head trained (5 epochs)
   - Phase 2: Full model unfrozen and fine tuned (30 epochs)
 - **Total parameters:** 2,553,031
-- **Trainable parameters:** 2,553,031 (Phase 2)
 - **Optimizer:** Adam with weight decay 1e-4
 - **Loss function:** CrossEntropyLoss
 - **Learning rate scheduler:** ReduceLROnPlateau
@@ -107,7 +122,7 @@ Each image is 48×48 pixels in grayscale, labeled with one of 7 emotions.
 
 Source: https://www.kaggle.com/datasets/msambare/fer2013
 
-The dataset is NOT uploaded to this repository due to its size. See setup instructions below.
+The dataset is NOT uploaded to this repository due to its size.
 
 ---
 
@@ -118,9 +133,9 @@ The dataset is NOT uploaded to this repository due to its size. See setup instru
 - [x] Stage 3: Model architecture — Transfer Learning with MobileNetV2
 - [x] Stage 4: Training — two-phase training on Google Colab T4 GPU
 - [x] Stage 5: Evaluation — 59.03% accuracy, confusion matrix, per-emotion F1 scores
-- [ ] Stage 6: Export — ONNX format for deployment
-- [ ] Stage 7: Deployment — FastAPI server + real-time webcam inference
-- [ ] Stage 8: Final project — live emotion overlay on webcam feed
+- [x] Stage 6: Export — ONNX and TorchScript formats
+- [x] Stage 7: Deployment — live on Hugging Face Spaces with face detection
+- [x] Stage 8: Final cleanup and documentation
 
 ---
 
@@ -131,12 +146,13 @@ The dataset is NOT uploaded to this repository due to its size. See setup instru
 | Python | 3.12 | Core language |
 | PyTorch | 2.11 | Deep learning framework |
 | Torchvision | 0.26 | Pretrained models and transforms |
-| OpenCV | 4.12 | Face detection, webcam, image processing |
+| OpenCV | 4.12 | Face detection, image processing |
 | Matplotlib | 3.9 | Visualization and training curves |
-| scikit-learn | 1.5 | Confusion matrix, F1 scores, evaluation |
+| scikit-learn | 1.5 | Confusion matrix, F1 scores |
 | tqdm | 4.66 | Progress bars during training |
-| FastAPI | - | Serving model as web API (Stage 7) |
+| Gradio | latest | Web interface for demo |
 | Google Colab | T4 GPU | Free GPU used for training |
+| Hugging Face | Spaces | Free model deployment |
 
 ---
 
@@ -144,33 +160,36 @@ The dataset is NOT uploaded to this repository due to its size. See setup instru
 
 Facial-Expression-Model/
 │
-├── data/                    ← dataset lives here (not on GitHub)
+├── data/                    ← dataset (not on GitHub)
 │
 ├── src/
-│   ├── dataset.py           ← data loading, augmentation, DataLoader
-│   ├── model.py             ← MobileNetV2 architecture with custom head
-│   ├── train.py             ← two-phase training loop with checkpointing
-│   ├── evaluate.py          ← accuracy, confusion matrix, F1 report
-│   ├── visualize.py         ← sample images and class distribution
-│   └── predict.py           ← run prediction on image or webcam
+│   ├── dataset.py           ← data loading and augmentation
+│   ├── model.py             ← MobileNetV2 architecture
+│   ├── train.py             ← two-phase training loop
+│   ├── evaluate.py          ← confusion matrix and F1 scores
+│   ├── export.py            ← ONNX and TorchScript export
+│   ├── predict.py           ← run prediction on any image
+│   └── visualize.py         ← dataset visualization
+│
+├── huggingface/
+│   ├── app.py               ← Gradio web app (deployed on HF)
+│   └── requirements.txt     ← Hugging Face dependencies
 │
 ├── models/
-│   ├── best_model.pth           ← trained model weights (not on GitHub)
 │   ├── curves_phase1.png        ← Phase 1 training curves
 │   ├── curves_phase2.png        ← Phase 2 training curves
 │   ├── confusion_matrix.png     ← evaluation confusion matrix
-│   ├── per_emotion_accuracy.png ← per-emotion accuracy bar chart
-│   └── classification_report.txt← precision, recall, F1 per emotion
+│   ├── per_emotion_accuracy.png ← per-emotion accuracy
+│   └── classification_report.txt← precision, recall, F1
 │
-├── notebooks/               ← Jupyter notebooks for experiments
-├── check.py                 ← environment verification script
-├── requirements.txt         ← all Python dependencies
-├── .gitignore               ← excludes data/, model weights, cache
+├── check.py                 ← environment verification
+├── requirements.txt         ← all dependencies
+├── .gitignore               ← excludes data/, model weights
 └── README.md                ← you are here
 
 ---
 
-## Setup — Run on Your Machine
+## Setup
 
 ### 1. Clone the repository
 ```bash
@@ -191,35 +210,24 @@ python check.py
 ### 4. Download the dataset
 - Go to https://www.kaggle.com/datasets/msambare/fer2013
 - Download and extract into the `data/` folder
-- Final structure:
 
-
-data/
-├── train/
-│   ├── angry/
-│   ├── happy/
-│   └── ...
-└── test/
-├── angry/
-└── ...
-
-### 5. Run evaluation on pretrained model
+### 5. Run prediction on an image
 ```bash
 cd src
-python evaluate.py
+python predict.py
 ```
 
 ---
 
 ## Key Findings
 
-**Strongest emotions:** Happy (77.9%) and Surprise (73.5%) — both have distinct visual features and sufficient training data.
+**Strongest emotions:** Happy (77.9%) and Surprise (73.5%) — distinct visual features and sufficient training data.
 
-**Weakest emotion:** Fear (39.9%) — frequently confused with Sad because both share similar facial features like downturned mouth and tense brows.
+**Weakest emotion:** Fear (39.9%) — frequently confused with Sad and Surprise due to shared facial features like raised eyebrows and wide eyes.
 
-**Biggest challenge:** Class imbalance — Disgust had only 436 training images compared to 7,215 for Happy. This directly caused the model to perform worse on underrepresented emotions.
+**Biggest challenge:** Class imbalance — Disgust had only 436 training images vs 7,215 for Happy. This directly caused lower performance on underrepresented emotions.
 
-**Overfitting observation:** After Epoch 20, training accuracy continued climbing (68%) while validation accuracy plateaued (59%), indicating mild overfitting. Future improvement: more aggressive dropout or early stopping at Epoch 23.
+**Overfitting observation:** After Epoch 20, training accuracy continued climbing (68%) while validation plateaued (59%). Future fix: more aggressive dropout or early stopping at Epoch 23.
 
 ---
 
@@ -227,28 +235,31 @@ python evaluate.py
 
 **Stage 1:** Clean project structure from day one saves confusion later. A proper `.gitignore` prevents accidentally pushing 500MB of training data.
 
-**Stage 2:** Always visualize your dataset before training. The class imbalance in FER2013 (436 disgust vs 7,215 happy) directly explains the model's weaknesses.
+**Stage 2:** Always visualize your dataset before training. The class imbalance directly explains the model's weaknesses.
 
-**Stage 3:** Transfer Learning with MobileNetV2 is the right choice for limited hardware. Starting from pretrained ImageNet weights dramatically reduced training time and improved accuracy.
+**Stage 3:** Transfer Learning with MobileNetV2 is the right choice for limited hardware — dramatically reduces training time and improves accuracy.
 
-**Stage 4:** Two-phase training matters. Phase 1 with frozen backbone gave 27% — fine tuning the full model in Phase 2 jumped it to 59%. The backbone learned face-specific features it didn't know from ImageNet.
+**Stage 4:** Two-phase training matters. Phase 1 gave 27% — fine tuning the full model jumped it to 59%.
 
-**Stage 5:** Accuracy alone is misleading. The confusion matrix revealed that the model is excellent at Happy but struggles with Fear — something a single accuracy number hides completely.
+**Stage 5:** Accuracy alone is misleading. The confusion matrix revealed the model is excellent at Happy but struggles with Fear.
+
+**Stage 6:** Exporting to ONNX makes the model portable — runs anywhere without PyTorch.
+
+**Stage 7:** Gradio + Hugging Face Spaces = free deployment in minutes. No server setup needed. Face detection with OpenCV improves real-world accuracy significantly.
 
 ---
 
 ## What Is Next
 
-- Deploy as a FastAPI web server so anyone can upload a photo and get a prediction
-- Build a real-time webcam demo for the project viva
 - Experiment with class-weighted loss to fix the disgust imbalance problem
 - Try training on AffectNet (1 million images) for higher accuracy
+- Build a real-time webcam demo
 
 ---
 
 ## Author
 
-Built by **Mirsa** — B.Tech final year project.
+Built by Sajad Bashir Mir — B.Tech final year project.
 Learning machine learning from absolute basics to full deployment.
 No prior ML experience at the start of this project.
 

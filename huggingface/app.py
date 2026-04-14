@@ -4,8 +4,8 @@ import torch.nn as nn
 from torchvision import models, transforms
 from PIL import Image
 import numpy as np
+import cv2
 
-# ── Emotions ─────────────────────────────────────────────────────────────────
 EMOTIONS = ['Angry', 'Disgust', 'Fear', 'Happy', 'Neutral', 'Sad', 'Surprise']
 
 EMOTION_EMOJIS = {
@@ -18,7 +18,6 @@ EMOTION_EMOJIS = {
     'Surprise': '😲'
 }
 
-# ── Build model ───────────────────────────────────────────────────────────────
 def build_model():
     model = models.mobilenet_v2(weights=None)
     model.features[0][0] = nn.Conv2d(
@@ -35,18 +34,18 @@ def build_model():
     )
     return model
 
-
-# ── Load model ────────────────────────────────────────────────────────────────
-device = torch.device('cpu')
-model  = build_model()
-
+device    = torch.device('cpu')
+model     = build_model()
 checkpoint = torch.load('best_model.pth', map_location=device)
 model.load_state_dict(checkpoint['model_state_dict'])
 model.eval()
 print(f"Model loaded — val_acc {checkpoint['val_acc']:.2f}%")
 
+# Load OpenCV face detector
+face_cascade = cv2.CascadeClassifier(
+    cv2.data.haarcascades + 'haarcascade_frontalface_default.xml'
+)
 
-# ── Image transform ───────────────────────────────────────────────────────────
 transform = transforms.Compose([
     transforms.Grayscale(num_output_channels=1),
     transforms.Resize((48, 48)),
@@ -55,17 +54,40 @@ transform = transforms.Compose([
 ])
 
 
-# ── Prediction function ───────────────────────────────────────────────────────
 def predict_emotion(image):
     if image is None:
         return {}
 
-    # Convert to PIL if needed
     if not isinstance(image, Image.Image):
         image = Image.fromarray(image)
 
+    # Convert to numpy for face detection
+    img_np    = np.array(image.convert('RGB'))
+    gray_np   = cv2.cvtColor(img_np, cv2.COLOR_RGB2GRAY)
+
+    # Detect faces
+    faces = face_cascade.detectMultiScale(
+        gray_np, scaleFactor=1.1,
+        minNeighbors=5, minSize=(30, 30)
+    )
+
+    if len(faces) > 0:
+        # Crop to first detected face
+        x, y, w, h = faces[0]
+        # Add small padding
+        pad = int(0.1 * w)
+        x1  = max(0, x - pad)
+        y1  = max(0, y - pad)
+        x2  = min(img_np.shape[1], x + w + pad)
+        y2  = min(img_np.shape[0], y + h + pad)
+        face_img = image.crop((x1, y1, x2, y2))
+    else:
+        # No face detected — use full image
+        face_img = image
+
     # Preprocess
-    tensor = transform(image).unsqueeze(0).to(device)
+    face_img = face_img.convert('RGB').convert('L')
+    tensor   = transform(face_img).unsqueeze(0).to(device)
 
     # Predict
     with torch.no_grad():
@@ -73,7 +95,6 @@ def predict_emotion(image):
         probs       = torch.softmax(outputs, dim=1)[0]
         probs_numpy = probs.cpu().numpy()
 
-    # Build result dictionary
     result = {}
     for emotion, prob in zip(EMOTIONS, probs_numpy):
         label = f"{EMOTION_EMOJIS[emotion]} {emotion}"
@@ -82,7 +103,6 @@ def predict_emotion(image):
     return result
 
 
-# ── Gradio interface ──────────────────────────────────────────────────────────
 with gr.Blocks(title="Facial Expression Recognition") as demo:
 
     gr.Markdown("""
@@ -91,7 +111,8 @@ with gr.Blocks(title="Facial Expression Recognition") as demo:
     
     **Model:** MobileNetV2 trained on FER2013 (35,887 images)  
     **Accuracy:** 59.03% on test set  
-    **Emotions:** Angry, Disgust, Fear, Happy, Neutral, Sad, Surprise
+    **Emotions:** Angry, Disgust, Fear, Happy, Neutral, Sad, Surprise  
+    **Note:** Works best with clear front-facing face photos
     """)
 
     with gr.Row():
@@ -119,11 +140,6 @@ with gr.Blocks(title="Facial Expression Recognition") as demo:
         fn=predict_emotion,
         inputs=image_input,
         outputs=output
-    )
-
-    gr.Examples(
-        examples=[],
-        inputs=image_input
     )
 
 demo.launch(server_name="0.0.0.0", server_port=7860)
